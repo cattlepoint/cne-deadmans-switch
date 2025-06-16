@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: |
+  CNE Deadman’s Switch – cheapest serverless heartbeat monitor.
+  • HTTP API endpoint with random UUID path
+  • Stub Lambda backend (returns 200 OK)
+  • CloudWatch alarm (no hits in 6 minutes) → SNS Notification
+  • CloudWatch OK (4 minutes after hit) → SNS Notification
+  • No parameters; deploy and subscribe an email to the SNS topic
+
+Resources:
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: DeadmansSwitchAlerts
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  PingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      MemorySize: 128
+      Timeout: 3
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'OK'}
+
+  HeartbeatApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: DeadmansSwitchAPI
+      ProtocolType: HTTP
+
+  PingIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HeartbeatApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PingFunction.Arn}/invocations
+      PayloadFormatVersion: "2.0"
+
+  PingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HeartbeatApi
+      RouteKey: !Join
+        - ""
+        - - "ANY /"
+          - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+      Target: !Sub integrations/${PingIntegration}
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HeartbeatApi
+      StageName: $default
+      AutoDeploy: true
+
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PingFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HeartbeatApi}/*/*/*
+
+  DeadmanAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "No pings in the last 6 minutes"
+      Namespace: "AWS/ApiGateway"
+      MetricName: Count
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref HeartbeatApi
+        - Name: Stage
+          Value: "$default"
+      Statistic: SampleCount
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+Outputs:
+  EndpointURL:
+    Description: "Heartbeat URL (use this to ping)"
+    Value: !Join
+      - ""
+      - - "https://"
+        - !Ref HeartbeatApi
+        - ".execute-api."
+        - !Ref AWS::Region
+        - ".amazonaws.com/"
+        - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+
+  RandomPathSegment:
+    Description: Unique path segment used in the URL
+    Value: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+
+  SnsTopicArn:
+    Description: SNS topic for ALARM/OK notifications (subscribe after deploy)
+    Value: !Ref AlertTopic
