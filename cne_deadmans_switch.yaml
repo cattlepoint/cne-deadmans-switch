@@ -1,3 +1,4 @@
+---
 AWSTemplateFormatVersion: "2010-09-09"
 Description: |
   CNE Deadman’s Switch – cheapest serverless heartbeat monitor.
