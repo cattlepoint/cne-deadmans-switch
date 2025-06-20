@@ -25,6 +25,15 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: AllowMetricRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:GetMetricStatistics
+                Resource: "*"
 
   PingFunction:
     Type: AWS::Lambda::Function
@@ -38,6 +47,53 @@ Resources:
         ZipFile: |
           def lambda_handler(event, context):
               return {'statusCode': 200, 'body': 'OK'}
+
+  PingsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      MemorySize: 128
+      Timeout: 3
+      Environment:
+        Variables:
+          API_ID: !Ref HeartbeatApi
+      Code:
+        ZipFile: |
+          import boto3, json, os, datetime
+          from zoneinfo import ZoneInfo
+
+          cw = boto3.client("cloudwatch")
+
+          def lambda_handler(event, context):
+              end = datetime.datetime.utcnow()
+              start = end - datetime.timedelta(minutes=15)
+              res = cw.get_metric_statistics(
+                  Namespace="AWS/ApiGateway",
+                  MetricName="Count",
+                  Dimensions=[
+                      {"Name": "ApiId", "Value": os.environ["API_ID"]},
+                      {"Name": "Stage", "Value": "$default"},
+                  ],
+                  StartTime=start,
+                  EndTime=end,
+                  Period=60,
+                  Statistics=["SampleCount"],
+              )
+              tz = ZoneInfo("America/Chicago")
+              timestamps = [
+                  dp["Timestamp"]
+                    .replace(tzinfo=datetime.timezone.utc)
+                    .astimezone(tz)
+                    .isoformat()
+                  for dp in sorted(
+                        res.get("Datapoints", []),
+                        key=lambda d: d["Timestamp"],
+                        reverse=True
+                    )[:15]
+              ]
+              return {"statusCode": 200, "body": json.dumps(timestamps)}
 
   HeartbeatApi:
     Type: AWS::ApiGatewayV2::Api
@@ -53,6 +109,14 @@ Resources:
       IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PingFunction.Arn}/invocations
       PayloadFormatVersion: "2.0"
 
+  PingsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HeartbeatApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PingsFunction.Arn}/invocations
+      PayloadFormatVersion: "2.0"
+
   PingRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -62,6 +126,13 @@ Resources:
         - - "ANY /"
           - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
       Target: !Sub integrations/${PingIntegration}
+
+  PingsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HeartbeatApi
+      RouteKey: "ANY /pings"
+      Target: !Sub integrations/${PingsIntegration}
 
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
@@ -78,10 +149,20 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HeartbeatApi}/*/*/*
 
+  PingsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PingsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HeartbeatApi}/*/*/pings
+
   DeadmanAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: "No pings in the last 6 minutes"
+      AlarmDescription: !Sub >
+        No pings in the last 6 minutes.
+        View history at https://${HeartbeatApi}.execute-api.${AWS::Region}.amazonaws.com/pings
       Namespace: "AWS/ApiGateway"
       MetricName: Count
       Dimensions:
@@ -118,3 +199,13 @@ Outputs:
   SnsTopicArn:
     Description: SNS topic for ALARM/OK notifications (subscribe after deploy)
     Value: !Ref AlertTopic
+
+  PingsURL:
+    Description: "URL to check last 15 heartbeat timestamps"
+    Value: !Join
+      - ""
+      - - "https://"
+        - !Ref HeartbeatApi
+        - ".execute-api."
+        - !Ref AWS::Region
+        - ".amazonaws.com/pings"
