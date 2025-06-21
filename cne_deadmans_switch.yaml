@@ -48,7 +48,7 @@ Resources:
       MemorySize: 128
       Timeout: 3
       TracingConfig:
-        Mode: PassThrough # disable active X‑Ray tracing
+        Mode: PassThrough
       Code:
         ZipFile: |
           def lambda_handler(event, context):
@@ -138,8 +138,7 @@ Resources:
       Name: DeadmansSwitchAPI
       ProtocolType: HTTP
       Tags:
-        - Key: Project
-          Value: !Ref AWS::StackName
+        Project: !Ref AWS::StackName
 
   PingIntegration:
     Type: AWS::ApiGatewayV2::Integration
