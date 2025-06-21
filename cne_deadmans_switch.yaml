@@ -192,8 +192,7 @@ Resources:
       StageName: $default
       AutoDeploy: true
       Tags:
-        - Key: Project
-          Value: !Ref AWS::StackName
+        Project: !Ref AWS::StackName
 
   InvokePermission:
     Type: AWS::Lambda::Permission
