@@ -49,19 +49,11 @@ Resources:
       Timeout: 3
       TracingConfig:
         Mode: PassThrough
+      LogRetentionInDays: 14
       Code:
         ZipFile: |
           def lambda_handler(event, context):
               return {'statusCode': 200, 'body': 'OK'}
-      Tags:
-        - Key: Project
-          Value: !Ref AWS::StackName
-
-  PingFunctionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Join ["", ["/aws/lambda/", !Ref PingFunction]]
-      RetentionInDays: 14
       Tags:
         - Key: Project
           Value: !Ref AWS::StackName
@@ -76,6 +68,7 @@ Resources:
       Timeout: 3
       TracingConfig:
         Mode: PassThrough
+      LogRetentionInDays: 14
       Environment:
         Variables:
           API_ID: !Ref HeartbeatApi
@@ -119,15 +112,6 @@ Resources:
                     )[:15]
               ]
               return {"statusCode": 200, "body": json.dumps(timestamps)}
-      Tags:
-        - Key: Project
-          Value: !Ref AWS::StackName
-
-  PingsFunctionLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Join ["", ["/aws/lambda/", !Ref PingsFunction]]
-      RetentionInDays: 14
       Tags:
         - Key: Project
           Value: !Ref AWS::StackName
