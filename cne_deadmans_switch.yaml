@@ -13,6 +13,9 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       DisplayName: DeadmansSwitchAlerts
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
 
   LambdaRole:
     Type: AWS::IAM::Role
@@ -44,10 +47,24 @@ Resources:
       Role: !GetAtt LambdaRole.Arn
       MemorySize: 128
       Timeout: 3
+      TracingConfig:
+        Mode: PassThrough # disable active X‑Ray tracing
       Code:
         ZipFile: |
           def lambda_handler(event, context):
               return {'statusCode': 200, 'body': 'OK'}
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
+
+  PingFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref PingFunction]]
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
 
   PingsFunction:
     Type: AWS::Lambda::Function
@@ -57,9 +74,15 @@ Resources:
       Role: !GetAtt LambdaRole.Arn
       MemorySize: 128
       Timeout: 3
+      TracingConfig:
+        Mode: PassThrough
       Environment:
         Variables:
           API_ID: !Ref HeartbeatApi
+          ROUTE: !Join
+            - ""
+            - - "/"
+              - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
       Code:
         ZipFile: |
           import boto3, json, os, datetime
@@ -76,6 +99,7 @@ Resources:
                   Dimensions=[
                       {"Name": "ApiId", "Value": os.environ["API_ID"]},
                       {"Name": "Stage", "Value": "$default"},
+                      {"Name": "Route", "Value": os.environ["ROUTE"]},
                   ],
                   StartTime=start,
                   EndTime=end,
@@ -95,19 +119,40 @@ Resources:
                     )[:15]
               ]
               return {"statusCode": 200, "body": json.dumps(timestamps)}
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
+
+  PingsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref PingsFunction]]
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
 
   HeartbeatApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
       Name: DeadmansSwitchAPI
       ProtocolType: HTTP
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
 
   PingIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref HeartbeatApi
       IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PingFunction.Arn}/invocations
+      IntegrationUri: !Join
+        - ""
+        - - "arn:aws:apigateway:"
+          - !Ref AWS::Region
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt PingFunction.Arn
+          - "/invocations"
       PayloadFormatVersion: "2.0"
 
   PingsIntegration:
@@ -115,7 +160,13 @@ Resources:
     Properties:
       ApiId: !Ref HeartbeatApi
       IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PingsFunction.Arn}/invocations
+      IntegrationUri: !Join
+        - ""
+        - - "arn:aws:apigateway:"
+          - !Ref AWS::Region
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt PingsFunction.Arn
+          - "/invocations"
       PayloadFormatVersion: "2.0"
 
   PingRoute:
@@ -141,6 +192,9 @@ Resources:
       ApiId: !Ref HeartbeatApi
       StageName: $default
       AutoDeploy: true
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
 
   InvokePermission:
     Type: AWS::Lambda::Permission
@@ -148,7 +202,15 @@ Resources:
       FunctionName: !Ref PingFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HeartbeatApi}/*/*/*
+      SourceArn: !Join
+        - ""
+        - - "arn:aws:execute-api:"
+          - !Ref AWS::Region
+          - ":"
+          - !Ref AWS::AccountId
+          - ":"
+          - !Ref HeartbeatApi
+          - "/*/*/*"
 
   PingsInvokePermission:
     Type: AWS::Lambda::Permission
@@ -156,14 +218,26 @@ Resources:
       FunctionName: !Ref PingsFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HeartbeatApi}/*/*/pings
+      SourceArn: !Join
+        - ""
+        - - "arn:aws:execute-api:"
+          - !Ref AWS::Region
+          - ":"
+          - !Ref AWS::AccountId
+          - ":"
+          - !Ref HeartbeatApi
+          - "/*/*/pings"
 
   DeadmanAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: !Sub >
-        No pings in the last 6 minutes.
-        View history at https://${HeartbeatApi}.execute-api.${AWS::Region}.amazonaws.com/pings
+      AlarmDescription: !Join
+        - ""
+        - - "No pings in the last 6 minutes. View history at https://"
+          - !Ref HeartbeatApi
+          - ".execute-api."
+          - !Ref AWS::Region
+          - ".amazonaws.com/pings"
       Namespace: "AWS/ApiGateway"
       MetricName: Count
       Dimensions:
@@ -171,6 +245,11 @@ Resources:
           Value: !Ref HeartbeatApi
         - Name: Stage
           Value: "$default"
+        - Name: Route
+          Value: !Join
+            - ""
+            - - "/"
+              - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
       Statistic: SampleCount
       Period: 60
       EvaluationPeriods: 1
@@ -180,6 +259,9 @@ Resources:
       TreatMissingData: breaching
       AlarmActions: [!Ref AlertTopic]
       OKActions: [!Ref AlertTopic]
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
 
 Outputs:
   EndpointURL:
