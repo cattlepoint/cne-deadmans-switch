@@ -1,4 +1,2 @@
 cfn-lint
 yamllint
-cfn-lint-ax
-cfn-lint-serverless
