@@ -24,11 +24,11 @@ If **no request is received for 6 minutes**, it sends an **ALARM** email; once
 
 ```bash
 # 1. Validate (optional)
-cfn-lint cne_deadmans_switch.yaml
+cfn-lint cne-deadmans-switch.yaml
 
 # 2. Deploy (replace <stack-name>, <region>)
 aws cloudformation deploy \
-  --template-file cne_deadmans_switch.yaml \
+  --template-file cne-deadmans-switch.yaml \
   --stack-name <stack-name> \
   --capabilities CAPABILITY_NAMED_IAM \
   --region <region>
@@ -73,7 +73,15 @@ curl $(aws cloudformation \
       --query "Stacks[0].Outputs[?OutputKey=='PingsURL'].OutputValue" \
       --output text) | jq .
 ```
-Returns an array of ISO‑8601 timestamps (local time — America/Chicago).
+Returns a JSON object:
+
+```json
+{
+  "recentPings": ["2025‑06‑22T10:01:03‑05:00", …],
+  "currentAlert": "OK"
+}
+```
+`recentPings` are ISO‑8601 timestamps (America/Chicago).
 
 ⸻
 
@@ -100,8 +108,8 @@ Total monthly cost is effectively $0 for most hobby workloads.
 Development
 ```bash
 pip install -r requirements.txt   # linters
-cfn-lint cne_deadmans_switch.yaml # validate
-yamllint cne_deadmans_switch.yaml # style
+cfn-lint cne-deadmans-switch.yaml # validate
+yamllint cne-deadmans-switch.yaml # style
 ```
 Both Lambda handlers are defined inline in the template; no separate source tree is required.
 
