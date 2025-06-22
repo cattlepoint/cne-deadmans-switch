@@ -37,6 +37,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - cloudwatch:GetMetricStatistics
+                  - cloudwatch:DescribeAlarms
                 Resource: "*"
 
   PingFunction:
@@ -70,6 +71,7 @@ Resources:
       Environment:
         Variables:
           API_ID: !Ref HeartbeatApi
+          ALARM_NAME: !Ref DeadmanAlarm
       Code:
         ZipFile: |
           import boto3, json, os, datetime
@@ -104,7 +106,11 @@ Resources:
                         reverse=True
                     )[:15]
               ]
-              return {"statusCode": 200, "body": json.dumps(timestamps)}
+              alarm_state = cw.describe_alarms(
+                  AlarmNames=[os.environ["ALARM_NAME"]]
+              )["MetricAlarms"][0]["StateValue"]
+              body = {"timestamps": timestamps, "status": alarm_state}
+              return {"statusCode": 200, "body": json.dumps(body)}
       Tags:
         - Key: Project
           Value: !Ref AWS::StackName
