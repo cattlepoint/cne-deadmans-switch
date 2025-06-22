@@ -124,8 +124,8 @@ Resources:
         - Key: Project
           Value: !Ref AWS::StackName
     DependsOn: PingFunction
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
 
   PingsLogGroup:
     Type: AWS::Logs::LogGroup
@@ -136,8 +136,8 @@ Resources:
         - Key: Project
           Value: !Ref AWS::StackName
     DependsOn: PingsFunction
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
 
   HeartbeatApi:
     Type: AWS::ApiGatewayV2::Api
