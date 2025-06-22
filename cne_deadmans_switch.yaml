@@ -109,7 +109,7 @@ Resources:
               alarm_state = cw.describe_alarms(
                   AlarmNames=[os.environ["ALARM_NAME"]]
               )["MetricAlarms"][0]["StateValue"]
-              body = {"recentHits": timestamps, "currentAlert": alarm_state}
+              body = {"recentPings": timestamps, "currentAlert": alarm_state}
               return {"statusCode": 200, "body": json.dumps(body)}
       Tags:
         - Key: Project
