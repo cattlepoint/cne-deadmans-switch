@@ -11,7 +11,8 @@ If **no request is received for 6 minutes**, it sends an **ALARM** email; once
 
 | Component                | Purpose                                                                                                 |
 |--------------------------|---------------------------------------------------------------------------------------------------------|
-| **API Gateway (HTTP)**   | Exposes `https://<api>/<random-uuid>` — the heartbeat URL.<br>`/pings` returns the 15 most recent hits.|
+| **Heartbeat API (HTTP)** | Exposes `https://<api>/<random-uuid>` — the heartbeat URL. |
+| **Pings API (HTTP)**     | Exposes `https://<pings-api>/` — returns the 15 most recent hits. |
 | **Ping Lambda**          | Lightweight stub: returns `200 OK` for any method on the random path.                                  |
 | **Pings Lambda**         | Reads CloudWatch metrics to list recent hits (for quick debugging).                                    |
 | **CloudWatch Alarm**     | `ALARM` if `AWS/ApiGateway Count < 1` in the last minute (i.e., 6 min without pings); returns to `OK` 4 min after next hit. |
@@ -88,7 +89,7 @@ Stack deletion removes all resources and stops all costs.
 
 | Service           | Steady State              | Notes                                         |
 |-------------------|--------------------------|-----------------------------------------------|
-| API Gateway       | $0.00 when idle          | HTTP API has per-request pricing              |
+| API Gateway (x2)  | $0.00 when idle          | Two HTTP APIs, both have per-request pricing  |
 | Lambda            | $0.00 when idle          | 128 MB × sub‑second → free at low volume      |
 | CloudWatch & SNS  | < $0.01/mo typical usage | At typical heartbeat traffic                  |
 
