@@ -49,7 +49,6 @@ Resources:
       Timeout: 3
       TracingConfig:
         Mode: PassThrough
-      LogRetentionInDays: 14
       Code:
         ZipFile: |
           def lambda_handler(event, context):
@@ -68,7 +67,6 @@ Resources:
       Timeout: 3
       TracingConfig:
         Mode: PassThrough
-      LogRetentionInDays: 14
       Environment:
         Variables:
           API_ID: !Ref HeartbeatApi
