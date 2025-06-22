@@ -1,0 +1,6 @@
+*
+!.gitignore
+!README.md
+!LICENSE
+!cne-deadmans-switch.yaml
+!cne-deadmans-switch-pipeline.yaml
