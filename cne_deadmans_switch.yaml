@@ -109,7 +109,7 @@ Resources:
               alarm_state = cw.describe_alarms(
                   AlarmNames=[os.environ["ALARM_NAME"]]
               )["MetricAlarms"][0]["StateValue"]
-              body = {"timestamps": timestamps, "status": alarm_state}
+              body = {"recentHits": timestamps, "currentAlert": alarm_state}
               return {"statusCode": 200, "body": json.dumps(body)}
       Tags:
         - Key: Project
@@ -256,7 +256,7 @@ Resources:
       AlarmDescription: !Join
         - ""
         - - "No pings in the last 6 minutes. View history at https://"
-          - !Ref HeartbeatApi
+          - !Ref PingsApi
           - ".execute-api."
           - !Ref AWS::Region
           - ".amazonaws.com/"
