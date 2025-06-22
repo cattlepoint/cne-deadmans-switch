@@ -141,6 +141,14 @@ Resources:
       Tags:
         Project: !Ref AWS::StackName
 
+  PingsApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: DeadmansSwitchPingsAPI
+      ProtocolType: HTTP
+      Tags:
+        Project: !Ref AWS::StackName
+
   PingIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
@@ -158,7 +166,7 @@ Resources:
   PingsIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ApiId: !Ref HeartbeatApi
+      ApiId: !Ref PingsApi
       IntegrationType: AWS_PROXY
       IntegrationUri: !Join
         - ""
@@ -182,15 +190,15 @@ Resources:
   PingsRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
-      ApiId: !Ref HeartbeatApi
+      ApiId: !Ref PingsApi
       RouteKey: "ANY /"
       Target: !Sub integrations/${PingsIntegration}
 
   PingsStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      ApiId: !Ref HeartbeatApi
-      StageName: pings
+      ApiId: !Ref PingsApi
+      StageName: $default
       AutoDeploy: true
       Tags:
         Project: !Ref AWS::StackName
@@ -233,8 +241,8 @@ Resources:
           - ":"
           - !Ref AWS::AccountId
           - ":"
-          - !Ref HeartbeatApi
-          - "/pings/*/*"
+          - !Ref PingsApi
+          - "/*/*/*"
 
   DeadmanAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -245,7 +253,7 @@ Resources:
           - !Ref HeartbeatApi
           - ".execute-api."
           - !Ref AWS::Region
-          - ".amazonaws.com/pings/"
+          - ".amazonaws.com/"
       Namespace: "AWS/ApiGateway"
       MetricName: Count
       Dimensions:
@@ -291,7 +299,7 @@ Outputs:
     Value: !Join
       - ""
       - - "https://"
-        - !Ref HeartbeatApi
+        - !Ref PingsApi
         - ".execute-api."
         - !Ref AWS::Region
-        - ".amazonaws.com/pings/"
+        - ".amazonaws.com/"
