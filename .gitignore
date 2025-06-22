@@ -1,7 +1,9 @@
+# ignore everything
+*
+# …except these
 !.gitignore
 !README.md
 !LICENSE
 !requirements.txt
 !cne-deadmans-switch.yaml
 !cne-deadmans-switch-pipeline.yaml
-*
