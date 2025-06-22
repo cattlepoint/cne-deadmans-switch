@@ -255,7 +255,7 @@ Resources:
     Properties:
       AlarmDescription: !Join
         - ""
-        - - "No pings in the last 6 minutes. View history at https://"
+        - - "No pings in the last 6 minutes. View recent history at https://"
           - !Ref PingsApi
           - ".execute-api."
           - !Ref AWS::Region
