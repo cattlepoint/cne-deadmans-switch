@@ -1,7 +1,7 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 Description: |
-  CNE Deadman’s Switch – cheapest serverless heartbeat monitor.
+  CNE Deadmans Switch – cheapest serverless heartbeat monitor.
   • HTTP API endpoint with random UUID path
   • Stub Lambda backend (returns 200 OK)
   • CloudWatch alarm (no hits in 6 minutes) → SNS Notification
