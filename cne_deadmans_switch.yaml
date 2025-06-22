@@ -114,6 +114,30 @@ Resources:
         - Key: Project
           Value: !Ref AWS::StackName
 
+  PingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref PingFunction]]
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
+    DependsOn: PingFunction
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+  PingsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref PingsFunction]]
+      RetentionInDays: 14
+      Tags:
+        - Key: Project
+          Value: !Ref AWS::StackName
+    DependsOn: PingsFunction
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
   HeartbeatApi:
     Type: AWS::ApiGatewayV2::Api
     Properties:
