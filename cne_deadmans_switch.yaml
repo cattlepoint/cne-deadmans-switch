@@ -70,10 +70,6 @@ Resources:
       Environment:
         Variables:
           API_ID: !Ref HeartbeatApi
-          ROUTE: !Join
-            - ""
-            - - "/"
-              - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
       Code:
         ZipFile: |
           import boto3, json, os, datetime
@@ -90,7 +86,6 @@ Resources:
                   Dimensions=[
                       {"Name": "ApiId", "Value": os.environ["API_ID"]},
                       {"Name": "Stage", "Value": "$default"},
-                      {"Name": "Route", "Value": os.environ["ROUTE"]},
                   ],
                   StartTime=start,
                   EndTime=end,
@@ -188,8 +183,17 @@ Resources:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref HeartbeatApi
-      RouteKey: "ANY /pings"
+      RouteKey: "ANY /"
       Target: !Sub integrations/${PingsIntegration}
+
+  PingsStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HeartbeatApi
+      StageName: pings
+      AutoDeploy: true
+      Tags:
+        Project: !Ref AWS::StackName
 
   DefaultStage:
     Type: AWS::ApiGatewayV2::Stage
@@ -230,7 +234,7 @@ Resources:
           - !Ref AWS::AccountId
           - ":"
           - !Ref HeartbeatApi
-          - "/*/*/pings"
+          - "/pings/*/*"
 
   DeadmanAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -241,7 +245,7 @@ Resources:
           - !Ref HeartbeatApi
           - ".execute-api."
           - !Ref AWS::Region
-          - ".amazonaws.com/pings"
+          - ".amazonaws.com/pings/"
       Namespace: "AWS/ApiGateway"
       MetricName: Count
       Dimensions:
@@ -249,11 +253,6 @@ Resources:
           Value: !Ref HeartbeatApi
         - Name: Stage
           Value: "$default"
-        - Name: Route
-          Value: !Join
-            - ""
-            - - "/"
-              - !Select [2, !Split ["/", !Ref "AWS::StackId"]]
       Statistic: SampleCount
       Period: 60
       EvaluationPeriods: 1
@@ -295,4 +294,4 @@ Outputs:
         - !Ref HeartbeatApi
         - ".execute-api."
         - !Ref AWS::Region
-        - ".amazonaws.com/pings"
+        - ".amazonaws.com/pings/"
